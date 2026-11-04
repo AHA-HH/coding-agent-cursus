@@ -6,16 +6,16 @@ Synthetic objects below exercise validators, never stand in for model evidence.
 """
 
 import ast
-from copy import deepcopy
-from datetime import date
 import json
 import math
-from pathlib import Path
 import re
 import sys
 import tomllib
+from copy import deepcopy
+from datetime import date
+from pathlib import Path
+from typing import Any
 from unittest import TestCase
-
 
 SESSION = Path(__file__).resolve().parents[1]
 FIXTURES = SESSION / "cursus" / "fixtures"
@@ -259,7 +259,7 @@ def test_d6_files_fit_limit_and_checks_are_stdlib_only():
         if isinstance(node, ast.Import):
             assert all(alias.name.split(".")[0] in sys.stdlib_module_names for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
-            assert node.level == 0 and node.module.split(".")[0] in sys.stdlib_module_names
+            assert node.level == 0 and node.module and node.module.split(".")[0] in sys.stdlib_module_names
 
 
 def example_prompt():
@@ -319,7 +319,7 @@ def test_d6_negative_attention_checks_every_head_and_row():
     parts = ["The", " animal", " didn't", " cross", " the", " street",
              " because", " it", " was", " too", " tired", "."]
     n = len(parts)
-    valid = {"meta": example_meta([GPT2]), "sentence": SENTENCE,
+    valid: dict[str, Any] = {"meta": example_meta([GPT2]), "sentence": SENTENCE,
              "tokens": [{"id": i, "text": text} for i, text in enumerate(parts)],
              "focus": 7, "referent": 1, "scale": 255, "layers": 12, "heads": 12,
              "weights": [[[[255 if q == k else 0 for k in range(n)]
@@ -344,7 +344,7 @@ def test_d6_negative_attention_checks_every_head_and_row():
 def test_d6_negative_completion_records():
     meta = example_meta([BASE, INSTRUCT])
     meta["decoding"] = {"do_sample": False, "num_beams": 1, "max_new_tokens": 48}
-    valid = {"meta": meta, "max_new_tokens": 48, "items": []}
+    valid: dict[str, Any] = {"meta": meta, "max_new_tokens": 48, "items": []}
     for index in range(5):
         prompt = f"Synthetic validator prompt {index}"
         record = {"input": prompt, "text": "Synthetic text", "token_ids": list(range(48)), "stop": "length"}

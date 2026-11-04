@@ -26,8 +26,20 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import schemas
-from .agents import (AgentFailure, AgentStopped, BuildResult, Decision, ExamResult, IssueRequest, ItemPlan, Objection,
-                     PlanResult, Probe, Request, Ruling)
+from .agents import (
+    AgentFailure,
+    AgentStopped,
+    BuildResult,
+    Decision,
+    ExamResult,
+    IssueRequest,
+    ItemPlan,
+    Objection,
+    PlanResult,
+    Probe,
+    Request,
+    Ruling,
+)
 from .model import CheckSpec, Finding
 
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
@@ -291,7 +303,7 @@ class LiveAgents:
                 f.write(json.dumps(record, default=str) + "\n")
             if self.meter:
                 self.meter.after(issue, role, vendor, outcome)
-            if code == 0 and not problems:
+            if code == 0 and value is not None and not problems:
                 return value
             if code == 0:
                 last_error, kind = "it did not match the schema: " + "; ".join(problems[:3]), "crash"

@@ -5,11 +5,10 @@ import sys
 import unittest
 from pathlib import Path
 
-from helpers import HAS_PYTEST, git
-from test_engine import EngineCase
-
+from helpers import HAS_PYTEST, git, present
 from implement_loop.agents import BuildResult, FakeAgents, Request
 from implement_loop.model import CheckSpec, Phase
+from test_engine import EngineCase
 
 
 class Builder(FakeAgents):
@@ -81,7 +80,7 @@ class RecordedParks(EngineCase):
         self.run_engine(agents=Builder(self.scripts, ignore_feedback_rounds=3))
         self.assertEqual(self.phase(2), Phase.DONE)
         self.assertTrue(self.events("replan", 2), "the stalled rounds brought a replan")
-        self.assertEqual(self.repo.main_file("checks/issue_2.sh").splitlines()[0], "#!/usr/bin/env bash",
+        self.assertEqual(present(self.repo.main_file("checks/issue_2.sh")).splitlines()[0], "#!/usr/bin/env bash",
                          "the locked test survived the replan")
         self.assertTrue(any(g["source"] == "earlier plan" for g in self.store.issue(2).grants))
 
@@ -166,6 +165,7 @@ class FileHardeningTests(unittest.TestCase):
     def test_replace_file_never_writes_through_a_link(self):
         import os
         import tempfile
+
         from implement_loop.engine import Engine
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
@@ -182,6 +182,7 @@ class FileHardeningTests(unittest.TestCase):
 
     def test_git_metadata_and_escapes_are_never_inside(self):
         import tempfile
+
         from implement_loop.engine import Engine
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -191,6 +192,7 @@ class FileHardeningTests(unittest.TestCase):
 
     def test_a_check_directory_outside_the_tree_is_refused(self):
         import tempfile
+
         from implement_loop import verify
         with tempfile.TemporaryDirectory() as d:
             root = Path(d) / "tree"

@@ -13,12 +13,12 @@ The CLIs use their own logins: this script reads no API key.
 """
 
 import argparse
+import sys
 from collections import Counter
 from datetime import date
-import sys
 
-import agent_cli
-from agent_cli import EFFORT, MODELS, RECORDED, Failure
+import agent_cli  # ty: ignore[unresolved-import]  # beside this script: ty skips that folder for PEP 723 scripts
+from agent_cli import EFFORT, MODELS, RECORDED, Failure  # ty: ignore[unresolved-import]  # likewise
 
 SCRIPT = "sampling.py"
 PROMPT = "Invent a name for a new optimization solver. Reply with the name only."

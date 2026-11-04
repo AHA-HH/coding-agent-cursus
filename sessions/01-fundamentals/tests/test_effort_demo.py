@@ -20,22 +20,21 @@ All git writes below are confined to a disposable reset-test clone.
 
 import ast
 import copy
-from datetime import date, datetime, timezone
 import hashlib
 import itertools
 import json
 import math
 import os
-from pathlib import Path
 import re
 import shlex
 import shutil
 import subprocess
 import sys
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
-
 
 SESSION = Path(__file__).resolve().parents[1]
 REPO = SESSION.parents[1]
@@ -213,7 +212,7 @@ def iso_date(value):
 def timestamp(value):
     assert isinstance(value, str) and "T" in value
     result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    assert result.tzinfo is not None and result.utcoffset().total_seconds() == 0, "Use UTC ISO timestamps"
+    assert result.tzinfo is not None and result.utcoffset() == timedelta(0), "Use UTC ISO timestamps"
     return result
 
 
@@ -942,6 +941,7 @@ def test_d2_oracle_recomputes_when_capacity_changes(tmp_path):
     assert changed, "Capacity must be literal puzzle data"
     script.write_text(ast.unparse(tree) + "\n", encoding="utf-8")
     match = re.search(r"\bcapacity\b[^\n\d]{0,80}(\d+)\b", prompt, re.I)
+    assert match, "The prompt states the capacity"
     changed_prompt = prompt[:match.start(1)] + str(changed_capacity) + prompt[match.end(1):]
     (destination / "prompt.txt").write_text(changed_prompt, encoding="utf-8")
     payloads, expected = live_payloads(0, DEFAULTS, changed_optimum)

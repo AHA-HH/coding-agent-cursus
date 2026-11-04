@@ -1,10 +1,10 @@
 """Exercise the run-of-show's actual fallback commands and time coverage (D2)."""
-from html.parser import HTMLParser
-from pathlib import Path
 import os
 import re
 import shlex
 import subprocess
+from html.parser import HTMLParser
+from pathlib import Path
 
 SESSION = Path(__file__).resolve().parents[1]
 
@@ -12,7 +12,10 @@ SESSION = Path(__file__).resolve().parents[1]
 class Rows(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.rows, self.row, self.cell, self.code = [], None, None, None
+        self.rows: list[list[dict]] = []
+        self.row: list[dict] | None = None
+        self.cell: dict | None = None
+        self.code: str | None = None
 
     def handle_starttag(self, tag, attrs):
         if tag == "tr":
@@ -30,9 +33,11 @@ class Rows(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag == "code" and self.code is not None:
+            assert self.cell is not None, "<code> outside a table cell"
             self.cell["codes"].append(self.code)
             self.code = None
         elif tag == "td" and self.cell is not None:
+            assert self.row is not None, "<td> outside a table row"
             self.row.append(self.cell)
             self.cell = None
         elif tag == "tr" and self.row:

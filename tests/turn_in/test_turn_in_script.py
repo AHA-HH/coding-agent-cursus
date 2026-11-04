@@ -7,13 +7,13 @@ Live agent invocation and GitHub ruleset enforcement remain owner evidence.
 
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
+from pathlib import Path
+from typing import Any
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/turn-in.sh"
@@ -103,7 +103,8 @@ esac
 
 def isolated_environment(tmp_path):
     """Reusable by the ruleset tests; never reads real gh credentials or Git config."""
-    assert shutil.which("git"), "git is a prerequisite"
+    real_git = shutil.which("git")
+    assert real_git, "git is a prerequisite"
     assert shutil.which("jq"), "real jq is a prerequisite (not mocked)"
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("GIT_", "GH_", "GITHUB_"))}
@@ -118,7 +119,7 @@ def isolated_environment(tmp_path):
         "GIT_COMMITTER_NAME": "Acceptance Student", "GIT_COMMITTER_EMAIL": "student@example.invalid",
         "GH_CONFIG_DIR": str(tmp_path / "gh-config"), "GH_PROMPT_DISABLED": "1",
         "GH_STATE": str(tmp_path / "gh-state.json"), "GH_LOG": str(tmp_path / "gh.jsonl"),
-        "REAL_GIT": shutil.which("git"), "GIT_LOG": str(tmp_path / "git.jsonl"),
+        "REAL_GIT": real_git, "GIT_LOG": str(tmp_path / "git.jsonl"),
         "SLEEP_LOG": str(tmp_path / "sleep.jsonl"), "LC_ALL": "C",
     })
     write(bindir / "gh", FAKE_GH, executable=True)
@@ -144,7 +145,7 @@ class Sandbox:
         self.fork_name = f"{handle}/cursus-1"
         self.scheme = scheme
         self.origin = self.fork_name if fork_origin else self.course
-        self.state = {
+        self.state: dict[str, Any] = {
             "login": handle, "origin": self.origin,
             "repos": {
                 self.course: {"nameWithOwner": self.course, "parent": None,

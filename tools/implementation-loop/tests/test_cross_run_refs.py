@@ -13,9 +13,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from helpers import SHIP, TempRepo, git, issue_body
-
 import implement_loop
+from helpers import SHIP, TempRepo, git, issue_body
 from implement_loop.agents import FakeAgents, Script
 from implement_loop.config import Caps, Config
 from implement_loop.engine import Engine
@@ -24,7 +23,6 @@ from implement_loop.graph import build_plan
 from implement_loop.model import Phase
 from implement_loop.state import RunStore
 from implement_loop.workspace import Workspace
-
 
 WAIT = 60
 
@@ -336,7 +334,7 @@ class ConcurrentRunsTests(LoopCase):
             finally:
                 finished.set()
 
-        b.git = observe
+        b.git = observe  # ty: ignore[invalid-assignment]  # test double
         thread = threading.Thread(target=contender, daemon=True)
         try:
             with a._mutex:
@@ -366,6 +364,7 @@ class ConcurrentRunsTests(LoopCase):
         proc = None
 
         def read_ready():
+            assert proc is not None and proc.stdout is not None
             output.append(proc.stdout.readline())
             ready.set()
 
@@ -434,6 +433,7 @@ class MissingBranchRecoveryTests(LoopCase):
         elif candidate == "behind-later-anchor":
             # The latest entry descends from the recorded build, but a later recorded engine sha
             # proves additional work must survive. Check each such field independently.
+            assert anchor_field is not None
             setattr(st, anchor_field, latest)
             bad = self.commit_object("sibling after the build but before a later anchor", recorded)
             git("update-ref", "HEAD", bad, cwd=wt)

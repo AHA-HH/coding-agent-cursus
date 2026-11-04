@@ -16,15 +16,15 @@ an infeasible or suboptimal attempt is still turned in.
 """
 
 import argparse
-from collections import Counter, defaultdict
 import csv
-from dataclasses import dataclass, field
 import hashlib
 import json
 import math
-from pathlib import Path
 import sys
-
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
 
 HERE = Path(__file__).resolve().parent
 DATA_DIR = HERE / "data"
@@ -167,9 +167,9 @@ class Report:
     warnings: list = field(default_factory=list)
     fatal: bool = False  # data or format: nothing could be checked
     skipped: tuple = ()  # contracts that could not be assessed
-    objective: float = None  # recomputed cost
-    breakdown: dict = None
-    reported: float = None
+    objective: Optional[float] = None  # recomputed cost
+    breakdown: Optional[dict] = None
+    reported: Optional[float] = None
 
 
 def _validate(solution, data):

@@ -5,7 +5,6 @@ import csv
 import json
 import math
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
@@ -13,9 +12,9 @@ import tempfile
 import time
 import tomllib
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import pytest
-
 
 SESSION = Path(__file__).resolve().parents[1]
 PACK = SESSION / "exercises" / "p00-lab"
@@ -319,7 +318,11 @@ def test_export_is_standalone_repo(exports):
             "export contract: student statement replaces instructor README"
         )
         config = tomllib.loads((directory / "pyproject.toml").read_text(encoding="utf-8"))
-        dependencies = {re.match(r"\s*([\w.-]+)", item)[1].lower() for item in config["project"]["dependencies"]}
+        dependencies = set()
+        for item in config["project"]["dependencies"]:
+            name = re.match(r"\s*([\w.-]+)", item)
+            assert name, f"solver contract: unreadable dependency {item!r}"
+            dependencies.add(name[1].lower())
         assert dependencies == {"highspy", "numpy", "pytest"}, "solver contract: only the agreed open runtime dependencies"
         agents = (directory / "AGENTS.md").read_text(encoding="utf-8").lower()
         assert "outside" in agents and all(word in agents for word in ("read", "search", "edit")), (

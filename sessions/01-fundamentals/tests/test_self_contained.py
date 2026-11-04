@@ -5,11 +5,10 @@ the acceptance evidence also requires source review of every session Python file
 """
 
 import ast
-from pathlib import Path
 import re
 import sys
 import tomllib
-
+from pathlib import Path
 
 SESSION = Path(__file__).resolve().parents[1]
 FORBIDDEN_IMPORTS = {"importlib", "runpy", "imp", "site"}
@@ -95,10 +94,11 @@ def test_python_imports_stay_in_session():
         item for item in config.get("dependency-groups", {}).get("fixtures", [])
         if isinstance(item, str)
     )
-    dependencies = {
-        re.match(r"\s*([\w.-]+)", requirement)[1].lower().replace("-", "_")
-        for requirement in requirements
-    }
+    dependencies = set()
+    for requirement in requirements:
+        name = re.match(r"\s*([\w.-]+)", requirement)
+        assert name, f"Unreadable requirement: {requirement!r}"
+        dependencies.add(name[1].lower().replace("-", "_"))
     allowed = sys.stdlib_module_names | dependencies
     paths = visible_files("*.py")
     assert paths, "Session must have its own Python tests"
