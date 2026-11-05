@@ -182,8 +182,11 @@ kinds of environment, each with its own exactly pinned ty:
   0010), which catches an API only one of them has:
   `... ty check --python-platform <linux|darwin|win32> exercises`.
 
-Warnings fail like errors. ty also merges a user-level `~/.config/ty/ty.toml` if you have one;
-CI has none, so its result is the one that counts. To bump ty, change the pin in
+Warnings fail like errors. ty also merges a user-level `~/.config/ty/ty.toml` if you have one,
+and searches `$PYTHONPATH` before the tree's own folders, so a `PYTHONPATH` naming another
+checkout makes it check this one against that one's modules (`scripts/check-changed.sh` runs
+ty without it; by hand, `env -u PYTHONPATH ...`). CI has neither, so its result is the one that
+counts. To bump ty, change the pin in
 `setup/pyproject.toml` and in every session's `typecheck` group together (CI rejects a session
 whose pin differs), relock each with the uv CI uses (0.11.28: `uv lock --project setup` from the
 root, `uv lock` in each session folder), and fix what the new version reports in the same pull
@@ -193,6 +196,25 @@ In an editor (VS Code with Astral's ty extension, for example), ty resolves thir
 against the interpreter selected in the editor. Select `sessions/<NN>-*/.venv` to get completions
 and hover types for a session's packages (highspy, numpy), and `setup/.venv` for the repository's
 own code. Opening a session folder as its own workspace folder also applies its `[tool.ty]`.
+
+## Lint rules
+
+The Python follows one set of Ruff rules: Ruff 0.17.3's default selection, less the few rules the
+root [`ruff.toml`](../ruff.toml) ignores, with a reason for each family kept or dropped. Editors'
+Ruff extension reads the same file, so the editor shows exactly these findings. From the
+repository root, with the Ruff locked here (see [Import order](#import-order)), or the same version
+through uvx:
+
+```sh
+uv run --project setup --locked ruff check .
+uvx ruff@0.17.3 check .
+```
+
+Fix a finding in the code, or ignore it on its line with `# noqa: <rule> - <reason>`. Write
+`check=False` on a `subprocess.run` whose failure the code handles itself, and `check=True` only
+where a failure must stop the program. The P00 files that the recorded agent runs pin by SHA-256
+take no edits: `ruff.toml` exempts them (`per-file-ignores`) from the rules that flag them. CI runs
+only the import-order part of these rules (below); check the rest before pushing.
 
 ## Import order
 
@@ -213,12 +235,12 @@ students' environment is unchanged. The P00 files that the recorded agent runs p
 exempt (`per-file-ignores` in `ruff.toml`).
 
 `ruff.toml` sets `required-version` to the pinned version, so a Ruff of any other version, such as
-the one an editor's Ruff extension bundles, refuses the configuration instead of sorting
+the one an editor's Ruff extension bundles, refuses the configuration instead of reporting
 differently. Point the extension at `setup/.venv/bin/ruff` (in VS Code, `ruff.path`, or
 `ruff.importStrategy` set to `fromEnvironment` with `setup/.venv` selected). To bump Ruff, change
 the pin in `setup/pyproject.toml` and `required-version` in `ruff.toml` together (a selector test
-fails when they differ), relock with `uv lock --project setup` (uv 0.11.28, as CI), and sort what
-the new version reorders in the same pull request, leaving the exempt P00 files alone.
+fails when they differ), relock with `uv lock --project setup` (uv 0.11.28, as CI), and fix what
+the new version reports in the same pull request, leaving the exempt P00 files alone.
 
 ## Validating a change
 
@@ -251,6 +273,9 @@ The rules err wide:
 - a deleted or renamed file counts under its old path;
 - a page is checked when it changes, when a file it loads changes, or when a file it links to is
   deleted or renamed.
+
+The selected Node suites run three files at a time, as on one of CI's 4-vCPU shard runners;
+`node --test`'s own default (one per core) overloads a larger machine past the suites' timeouts.
 
 CI makes the same selection: on a pull request, ci.yml's `changes` job runs `impact.py github`
 on the pull request's `BASE...HEAD`, and only the selected jobs, Node suites and pages run.
@@ -431,7 +456,7 @@ checks are in [`turn-in-owner-checks.md`](turn-in-owner-checks.md).
 | Session 1 Act III agent demos | Checked-in `sessions/01-fundamentals/cursus/demos/agent/` (standard-library Python, including the context-bomb MCP server, passed per CLI invocation only); demo folders under `<tempdir>/cursus-s1-agent/`; uses the installed `claude`, `codex` and `tmux` |
 | ty, and pytest for its import resolution, for the repository's own Python | `uv run --project setup --locked` installs the versions and hashes locked in [`uv.lock`](uv.lock) into `setup/.venv/`, using a Python 3.11 or newer that uv finds or downloads; configured by the root `ty.toml` |
 | ty for each session's Python | The session's `typecheck` dependency group, locked in its `uv.lock`; `uv run --locked --group typecheck` installs it into the session's `.venv/` |
-| Ruff, to check and sort imports | `uv run --project setup --locked` installs the version and hashes locked in [`uv.lock`](uv.lock) into `setup/.venv/`, beside ty; configured by the root `ruff.toml`, whose `required-version` matches the pin |
+| Ruff, to lint and sort imports | `uv run --project setup --locked` installs the version and hashes locked in [`uv.lock`](uv.lock) into `setup/.venv/`, beside ty (`uvx ruff@0.17.3` fetches the same version into uv's per-user cache); configured by the root `ruff.toml`, whose `required-version` matches the pin |
 | Change-based check selection | Checked-in `tools/test-impact/` (standard-library Python) and `scripts/check-changed.sh`; installs nothing, runs the checks above with their own tools |
 | MCP servers, third-party agent skills, global agent configuration | None installed or modified |
 

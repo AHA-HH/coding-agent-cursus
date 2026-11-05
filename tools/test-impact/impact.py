@@ -31,14 +31,16 @@ ROOT = Path(__file__).resolve().parents[2]
 MAP = Path(__file__).with_name("impact.toml")
 SUITES_DIR = "tools/html-pages/tests"
 SUITE_SUFFIX = ".test.mjs"
-PAGE_RE = re.compile(r"^(docs|sessions)/.*\.html?$", re.I)
-MARKER = re.compile(r"""data-design-system\s*=\s*["']cursus["']""", re.I)
+PAGE_RE = re.compile(r"^(docs|sessions)/.*\.html?$", re.IGNORECASE)
+MARKER = re.compile(r"""data-design-system\s*=\s*["']cursus["']""", re.IGNORECASE)
 # What check-page.mjs resolves on a page: runtime assets, whose content matters, and link
 # targets, of which only existence matters.
-RUNTIME = re.compile(r"""\s(?:src|data|poster)\s*=\s*["']([^"'#?]+)|<link\b[^>]*?\shref\s*=\s*["']([^"'#?]+)""", re.I)
-LINK = re.compile(r"""\shref\s*=\s*["']([^"'#?]+)""", re.I)
+RUNTIME = re.compile(r"""\s(?:src|data|poster)\s*=\s*["']([^"'#?]+)|<link\b[^>]*?\shref\s*=\s*["']([^"'#?]+)""", re.IGNORECASE)
+LINK = re.compile(r"""\shref\s*=\s*["']([^"'#?]+)""", re.IGNORECASE)
 # The platforms students run the exercises on (ADR 0010), as ty names them.
 PLATFORMS = ("linux", "darwin", "win32")
+# Node suite files run at once locally, as on one of html-pages.yml's shards.
+NODE_CONCURRENCY = 3
 
 
 @functools.cache
@@ -138,7 +140,7 @@ def resolve(page: str, values: set[str]) -> set[str]:
     folder = (ROOT / page).parent
     found = set()
     for value in values:
-        if re.match(r"^[a-z][a-z0-9+.-]*:", value, re.I) or value.startswith("//"):
+        if re.match(r"^[a-z][a-z0-9+.-]*:", value, re.IGNORECASE) or value.startswith("//"):
             continue
         # As check-page.mjs resolves it: the attribute's text, then the URL's path, decoded.
         target = os.path.normpath(folder / unquote(html.unescape(value)))
@@ -262,10 +264,25 @@ def commands(plan: Plan) -> list[tuple[str, list[str], Path]]:
         out.append((session, ["uv", "run", "--locked", "--group", "parallel", "pytest", "-q", "-m", "not live", "-n", "auto"],
                     ROOT / session))
     if plan.suites:
-        out.append((f"{len(plan.suites)} node suite(s)", ["node", "--test", *plan.suites], ROOT))
+        # As many suite files at once as on a CI shard's runner (4 vCPUs, so node's default is 3):
+        # node's default on a larger machine starts a browser per core, and the suites' timeouts
+        # and timing thresholds are set for CI's load, not that one.
+        out.append((f"{len(plan.suites)} node suite(s)", ["node", "--test", f"--test-concurrency={NODE_CONCURRENCY}",
+                                                          *plan.suites], ROOT))
     if plan.pages:
         out.append((f"{len(plan.pages)} page(s)", ["node", "tools/html-pages/check-repo-pages.mjs", *plan.pages], ROOT))
     return out
+
+
+def command_env(command: list[str]) -> dict[str, str]:
+    """The environment a check runs in. ty adds $PYTHONPATH to its module search paths, ahead of
+    the tree's own folders, so an inherited one (an activated environment, a wrapper that loads a
+    pytest plugin from another checkout) would type-check this tree against someone else's modules;
+    the type checks run without it, as in CI. Every other check inherits the environment as is."""
+    env = dict(os.environ)
+    if "ty" in command:
+        env.pop("PYTHONPATH", None)
+    return env
 
 
 def github_output(plan: Plan, path: str) -> None:
@@ -285,8 +302,7 @@ def github_output(plan: Plan, path: str) -> None:
         "html": str(bool(plan.suites or plan.pages)).lower(),
     }
     with open(path, "a", encoding="utf-8") as out:
-        for key, value in values.items():
-            out.write(f"{key}={value}\n")
+        out.writelines(f"{key}={value}\n" for key, value in values.items())
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -312,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
     failed = []
     for label, command, cwd in commands(plan):
         print(f"\n== {label}: {' '.join(command)}", flush=True)
-        if subprocess.run(command, cwd=cwd).returncode != 0:
+        if subprocess.run(command, cwd=cwd, env=command_env(command), check=False).returncode != 0:
             failed.append(label)
     print("\n" + (f"FAILED: {', '.join(failed)}" if failed else "All selected checks passed."))
     return 1 if failed else 0
