@@ -700,3 +700,20 @@ def test_turn_in_policy(pack, instance, case, code, tag):
         assert "warn" in result.stdout.lower() and "solution.json" in result.stdout.lower(), output(result)
     else:
         assert result.stdout.splitlines()[0] == "PASS", output(result)
+
+
+@pytest.mark.parametrize("mini", ["none", "malformed"])
+def test_turn_in_gate_runs_the_mini_homework_then_p01(mini, tmp_path):
+    # The real gate on a copy of exercises/: both checkers warn on a missing solution; a malformed mini
+    # homework solution stops the turn-in before P01's checker runs.
+    shutil.copytree(SESSION / "exercises", tmp_path / "exercises",
+                    ignore=shutil.ignore_patterns("solution.json", "work", "__pycache__"))
+    if mini == "malformed":
+        (tmp_path / "exercises/mini-homework/solution.json").write_text("{", encoding="utf-8")
+    result = run(["bash", "exercises/turn-in-check.sh"], tmp_path, timeout=120)
+    if mini == "none":
+        assert result.returncode == 0, output(result)
+        assert "mini homework solution.json" in result.stdout and "homework-p01" in result.stdout, output(result)
+    else:
+        assert result.returncode == 1 and "format:" in result.stdout, output(result)
+        assert "homework-p01" not in result.stdout, output(result)

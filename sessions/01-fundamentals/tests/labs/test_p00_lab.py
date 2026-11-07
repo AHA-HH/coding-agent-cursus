@@ -191,6 +191,48 @@ def test_contract_suite_passes_reference_and_names_each_planted_bug(exports, tmp
         )
 
 
+def tree(directory):
+    skip = {".git", "__pycache__", ".pytest_cache"}
+    return {path.relative_to(directory).as_posix(): path.read_bytes() for path in directory.rglob("*")
+            if path.is_file() and not skip.intersection(path.relative_to(directory).parts)}
+
+
+@pytest.fixture(scope="module")
+def tests_dir_exports(tmp_path_factory):
+    # The recorded agent runs (cursus/fixtures/runs) export with --tests-dir: the suite moves to tests/.
+    root = tmp_path_factory.mktemp("p00-tests-dir")
+    result = {}
+    for index, selector in enumerate(SELECTORS):
+        target = root / f"lab-{index}"
+        success([sys.executable, PACK / "export.py", "--tests-dir", "--bug", selector, "--out", target], root)
+        result[selector] = target
+    return result
+
+
+def test_tests_dir_layout_moves_only_the_suite(exports, tests_dir_exports):
+    default, moved = tree(exports["none"]), tree(tests_dir_exports["none"])
+    assert set(moved) == (set(default) - {"test_p00_contract.py"}) | {"tests/test_p00_contract.py", "tests/__init__.py"}
+    assert moved["tests/test_p00_contract.py"] == default["test_p00_contract.py"] and moved["tests/__init__.py"] == b""
+    assert moved[".gitignore"] == default[".gitignore"] + b".claude/settings.local.json\n"
+    assert all(moved[name] == default[name] for name in set(default) - {"test_p00_contract.py", "AGENTS.md", ".gitignore"})
+    assert "tests/" in moved["AGENTS.md"].decode("utf-8")
+
+
+@pytest.mark.parametrize("selector", SELECTORS)
+def test_tests_dir_variant_changes_only_the_model_and_fails_its_contract(selector, tests_dir_exports):
+    reference, variant = tree(tests_dir_exports["none"]), tree(tests_dir_exports[selector])
+    assert variant.keys() == reference.keys()
+    assert [name for name in variant if variant[name] != reference[name]] == ([] if selector == "none" else ["p00_model.py"])
+    assert success(["git", "status", "--short"], tests_dir_exports[selector]) == ""
+    suite = run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-rN"], tests_dir_exports[selector])
+    summary = suite.stdout.strip().splitlines()[-1]
+    assert "skipped" not in summary and "error" not in summary, suite.stdout
+    if selector == "none":
+        assert suite.returncode == 0 and "passed" in summary and "failed" not in summary, suite.stdout
+    else:
+        assert suite.returncode == 1 and "failed" in summary and CONTRACTS[selector] in suite.stdout, suite.stdout
+
+
 def test_dropped_demand_is_strictly_better(exports):
     reference = json.loads(success([sys.executable, "p00_model.py"], exports["none"]))
     other = json.loads(success([sys.executable, "p00_model.py"], exports["dropped-demand"]))

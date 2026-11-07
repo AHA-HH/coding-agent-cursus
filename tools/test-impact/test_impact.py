@@ -276,7 +276,7 @@ def test_the_real_map_on_known_changes():
     fixture = impact.select(Change({"sessions/01-fundamentals/cursus/fixtures/next_token.json"}))
     for suite in ("next-token", "tokenizer", "sampler"):
         assert f"{lessons}/{suite}.test.mjs" in fixture.suites, suite
-    exercise = impact.select(Change({"sessions/01-fundamentals/exercises/l3-word-problem/check.py"}))
+    exercise = impact.select(Change({"sessions/01-fundamentals/exercises/mini-homework/check.py"}))
     assert exercise.parts == ["sessions/01-fundamentals/tests/labs"] and exercise.sessions == ["sessions/01-fundamentals"]
     engine = impact.select(Change({"tools/implementation-loop/implement_loop/engine.py"}))
     assert engine.units == {"engine", "typecheck", "imports"} and not engine.parts and not engine.pages

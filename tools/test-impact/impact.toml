@@ -176,7 +176,7 @@ opening-close = ["sessions/01-fundamentals/cursus/00-opening.html", "sessions/01
 sampler = ["sessions/01-fundamentals/cursus/01-sampler.html", "sessions/01-fundamentals/cursus/labs/tokenizer.html", "sessions/01-fundamentals/cursus/fixtures/*.json"]
 thinking = ["sessions/01-fundamentals/cursus/02-thinking.html", "sessions/01-fundamentals/cursus/demos/effort/**"]
 agent = ["sessions/01-fundamentals/cursus/03-agent.html", "sessions/01-fundamentals/cursus/demos/agent/**", "sessions/01-fundamentals/cursus/fixtures/runs/**"]
-evidence = ["sessions/01-fundamentals/cursus/04-evidence.html", "sessions/01-fundamentals/cursus/fixtures/runs/**", "sessions/01-fundamentals/exercises/lab-ladder.html", "sessions/01-fundamentals/exercises/p00-lab/**", "setup/pr-only-main.json"]
+evidence = ["sessions/01-fundamentals/cursus/04-evidence.html", "sessions/01-fundamentals/exercises/mini-homework/**"]
 # Session 1 teaching labs: the lab and the files it is built from.
 agent-loop = ["sessions/01-fundamentals/cursus/labs/agent-loop.html", "sessions/01-fundamentals/cursus/fixtures/runs/**", "sessions/01-fundamentals/cursus/demos/agent/**"]
 attention = ["sessions/01-fundamentals/cursus/labs/attention.html", "sessions/01-fundamentals/cursus/fixtures/attention.json"]

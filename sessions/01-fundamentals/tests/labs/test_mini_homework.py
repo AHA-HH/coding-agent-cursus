@@ -1,7 +1,7 @@
-"""Locked instructor acceptance checks for the L3 cyclic staffing exercise.
+"""Locked instructor acceptance checks for the mini homework, the cyclic staffing exercise of Act IV.
 
-The reference model and witness rosters live here, outside the student pack.
-Run from the session with ``uv run pytest -q tests/labs/test_l3_word_problem.py``.
+The reference model, witness rosters and seeded wrong rosters live here, outside the student pack.
+Run from the session with ``uv run pytest -q tests/labs/test_mini_homework.py``.
 The checker is always a subprocess; no implementation module is imported.
 """
 
@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 SESSION = Path(__file__).resolve().parents[2]
-PACK = SESSION / "exercises" / "l3-word-problem"
+PACK = SESSION / "exercises" / "mini-homework"
 DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 DEMAND = dict(zip(DAYS, (8, 7, 8, 9, 8, 5, 6)))
 OPTIMAL = (4, 1, 2, 1, 1, 1, 1)
@@ -390,15 +390,19 @@ def test_check_command_default_and_override(copied_pack, tmp_path):
     verdict(run_check(alternate, pack=copied_pack, cwd=tmp_path), False, {"objective"})
 
 
-@pytest.mark.parametrize("name,starts,reported,contracts", [
-    ("understaffed", (4, 1, 2, 1, 1, 1, 0), 10, {"feasibility", "optimality"}),
-    ("fractional", LP_POINT, 10.2, {"integrality", "optimality"}),
-    ("misreported", (4, 1, 2, 2, 1, 1, 1), 11, {"objective", "optimality"}),
-])
-def test_seeded_wrong_solution(name, starts, reported, contracts):
-    path = PACK / "wrong" / f"{name}.json"
-    assert path.is_file(), f"A1: missing seeded wrong solution {name}"
-    assert json.loads(path.read_text(encoding="utf-8")) == payload(starts, reported)
+# Three seeded wrong rosters, each rejected for a different contract (Act IV's #check slide uses the same three;
+# test_evidence_deck.py reads them from the deck).
+SEEDED = {
+    "understaffed": ((4, 1, 2, 1, 1, 1, 0), 10, {"feasibility", "optimality"}),
+    "fractional": (LP_POINT, 10.2, {"integrality", "optimality"}),
+    "misreported": ((4, 1, 2, 2, 1, 1, 1), 11, {"objective", "optimality"}),
+}
+
+
+@pytest.mark.parametrize("name", SEEDED)
+def test_seeded_wrong_solution(name, tmp_path):
+    starts, reported, contracts = SEEDED[name]
+    path = write_solution(tmp_path, payload(starts, reported), f"{name}.json")
     result = run_check(path)
     messages = verdict(result, False, contracts)
     if name == "understaffed":
@@ -411,3 +415,72 @@ def test_seeded_wrong_solution(name, starts, reported, contracts):
     else:
         assert any(has_number(line, 11) and has_number(line, 12) for line in messages["objective"])
     assert_summary(result, sum(starts))
+
+
+@pytest.mark.parametrize("case,code,first", [
+    ("missing", 0, "WARNING"),
+    ("optimal", 0, "PASS"),
+    ("understaffed", 0, "FAIL"),
+    ("malformed", 1, "FAIL"),
+    ("edited data", 1, "FAIL"),
+    ("missing, edited data", 1, "FAIL"),
+    ("a directory", 1, "FAIL"),
+])
+def test_turn_in_gate_blocks_only_data_and_format(case, code, first, copied_pack):
+    # Same policy as P01's --turn-in: a missing file warns, data or format blocks, a verdict is submitted.
+    solution = copied_pack / "solution.json"
+    if case == "optimal":
+        solution.write_text(json.dumps(payload()), encoding="utf-8")
+    elif case == "understaffed":
+        starts, reported, _ = SEEDED["understaffed"]
+        solution.write_text(json.dumps(payload(starts, reported)), encoding="utf-8")
+    elif case == "malformed":
+        solution.write_text("{", encoding="utf-8")
+    elif case == "a directory":
+        solution.mkdir()
+    if "edited data" in case:
+        if case == "edited data":
+            solution.write_text(json.dumps(payload()), encoding="utf-8")
+        csv_path = copied_pack / "data" / "demand.csv"
+        csv_path.write_text(csv_path.read_text(encoding="utf-8").replace("Mon,8", "Mon,7"), encoding="utf-8")
+    result = subprocess.run([sys.executable, str(copied_pack / "check.py"), "--turn-in"], cwd=copied_pack,
+                            env=child_env(), capture_output=True, text=True, encoding="utf-8", timeout=10, check=False)
+    assert result.returncode == code and result.stdout.splitlines()[0].startswith(first), result.stdout
+    assert result.stdout.isascii() and "Traceback" not in result.stderr, result.stdout + result.stderr
+    assert ("submitted as is" in result.stdout) == (case in ("optimal", "understaffed")), result.stdout
+
+
+def test_readme_done_criterion_in_a_git_checkout(tmp_path):
+    """README step 4, as a student runs it from sessions/01-fundamentals: PASS, and git status lists only the two
+    new paths; an edited check.py shows up as a modified line. uv's interpreter selection is the only substitution."""
+    readme = (PACK / "README.md").read_text(encoding="utf-8")
+    block = re.search(r"### 4\. Check.*?```sh\n(.*?)\n```", readme, re.S)
+    assert block, "README step 4 gives its commands"
+    commands = block[1].splitlines()
+    session = tmp_path / "course" / "sessions" / "01-fundamentals"
+    pack = session / "exercises" / "mini-homework"
+    shutil.copytree(PACK, pack)
+    env = {key: value for key, value in child_env().items() if not key.startswith("GIT_")}
+    git = ["git", "-c", "user.name=student", "-c", "user.email=student@example.invalid"]
+    for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "course"]):
+        subprocess.run(git + args, cwd=tmp_path / "course", env=env, check=True, capture_output=True)
+    (pack / "work").mkdir()
+    (pack / "work" / "model.py").write_text(
+        "import json, pathlib\n"
+        f"roster = {payload()!r}\n"
+        "pathlib.Path(__file__).resolve().parents[1].joinpath('solution.json').write_text(json.dumps(roster))\n",
+        encoding="utf-8")
+
+    def run(command):
+        args = command.split()
+        if args[:3] == ["uv", "run", "python"]:
+            args = [sys.executable, *args[3:]]
+        return subprocess.run(args, cwd=session, env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
+
+    model, check, status = (run(command) for command in commands)
+    assert model.returncode == 0, model.stderr
+    assert check.returncode == 0 and check.stdout.splitlines()[0] == "PASS", check.stdout
+    assert status.stdout.splitlines() == ["?? exercises/mini-homework/solution.json", "?? exercises/mini-homework/work/"]
+    with (pack / "check.py").open("a", encoding="utf-8") as stream:
+        stream.write("# edited\n")
+    assert " M exercises/mini-homework/check.py" in run(commands[2]).stdout.splitlines()
